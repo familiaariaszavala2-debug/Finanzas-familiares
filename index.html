@@ -155,7 +155,7 @@
 
                 <!-- Historial de Transacciones -->
                 <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                    <h3 class="font-bold text-slate-800 mb-4">Movimientos Registrados</h3>
+                    <h3 class="font-bold text-slate-800 mb-4">Movimientos Registrados (Nube)</h3>
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-sm">
                             <thead>
@@ -241,17 +241,47 @@
         </div>
     </div>
 
-    <!-- JavaScript de la aplicación -->
-    <script>
-        let currentUser = '';
-        let usersDB = JSON.parse(localStorage.getItem('family_finance_users')) || {
+    <!-- Firebase SDK e Initialización -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, getDocs, addDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDq8__RHLGCr9EVFm3NEebErS-m8nosXM",
+            authDomain: "finanzas-familiares-9de5e.firebaseapp.com",
+            projectId: "finanzas-familiares-9de5e",
+            storageBucket: "finanzas-familiares-9de5e.firebasestorage.app",
+            messagingSenderId: "827890681487",
+            appId: "1:827890681487:web:325ee028c70bbf439112fa"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // Variables globales expuestas a window
+        window.currentUser = '';
+        window.usersDB = JSON.parse(localStorage.getItem('family_finance_users')) || {
             'papá': 'luisroberto',
             'mamá': 'cruzmaribel'
         };
-        let transactions = JSON.parse(localStorage.getItem('family_finance_txs')) || [];
+        window.transactions = [];
         let chartInstance = null;
 
-        function toggleAuthMode(mode) {
+        // Cargar transacciones desde Firestore al iniciar
+        async function loadTransactions() {
+            try {
+                const querySnapshot = await getDocs(collection(db, "transactions"));
+                window.transactions = [];
+                querySnapshot.forEach((docSnap) => {
+                    window.transactions.push({ firebaseId: docSnap.id, ...docSnap.data() });
+                });
+                updateUI();
+            } catch (e) {
+                console.error("Error cargando transacciones: ", e);
+            }
+        }
+
+        window.toggleAuthMode = function(mode) {
             const loginForm = document.getElementById('login-form');
             const registerForm = document.getElementById('register-form');
             const subtitle = document.getElementById('auth-subtitle');
@@ -265,53 +295,53 @@
                 loginForm.classList.remove('hidden');
                 subtitle.innerText = 'Inicia sesión para gestionar el hogar';
             }
-        }
+        };
 
-        function handleRegister(e) {
+        window.handleRegister = function(e) {
             e.preventDefault();
             const user = document.getElementById('reg-user').value.trim().toLowerCase();
             const pass = document.getElementById('reg-pass').value.trim();
             const errorEl = document.getElementById('reg-error');
 
-            if (usersDB[user]) {
+            if (window.usersDB[user]) {
                 errorEl.classList.remove('hidden');
                 return;
             }
 
-            usersDB[user] = pass;
-            localStorage.setItem('family_finance_users', JSON.stringify(usersDB));
+            window.usersDB[user] = pass;
+            localStorage.setItem('family_finance_users', JSON.stringify(window.usersDB));
             
             alert('¡Cuenta creada con éxito! Ahora puedes iniciar sesión.');
-            toggleAuthMode('login');
-        }
+            window.toggleAuthMode('login');
+        };
 
-        function handleLogin(e) {
+        window.handleLogin = function(e) {
             e.preventDefault();
             const user = document.getElementById('login-user').value.trim().toLowerCase();
             const pass = document.getElementById('login-pass').value.trim();
             const errorEl = document.getElementById('login-error');
 
-            if (usersDB[user] && usersDB[user] === pass) {
-                currentUser = user.charAt(0).toUpperCase() + user.slice(1);
+            if (window.usersDB[user] && window.usersDB[user] === pass) {
+                window.currentUser = user.charAt(0).toUpperCase() + user.slice(1);
                 errorEl.classList.add('hidden');
-                document.getElementById('user-badge').innerText = currentUser;
+                document.getElementById('user-badge').innerText = window.currentUser;
                 document.getElementById('auth-screen').classList.add('hidden');
                 document.getElementById('app-screen').classList.remove('hidden');
-                updateUI();
+                loadTransactions();
             } else {
                 errorEl.classList.remove('hidden');
             }
-        }
+        };
 
-        function logout() {
-            currentUser = '';
+        window.logout = function() {
+            window.currentUser = '';
             document.getElementById('login-user').value = '';
             document.getElementById('login-pass').value = '';
             document.getElementById('app-screen').classList.add('hidden');
             document.getElementById('auth-screen').classList.remove('hidden');
-        }
+        };
 
-        function addTransaction(e, type) {
+        window.addTransaction = async function(e, type) {
             e.preventDefault();
             let desc, amount, category;
 
@@ -330,28 +360,32 @@
             }
 
             const tx = {
-                id: Date.now(),
-                user: currentUser,
+                user: window.currentUser,
                 type,
                 desc,
                 amount,
                 category,
-                date: new Date().toLocaleDateString()
+                date: new Date().toLocaleDateString(),
+                createdAt: Date.now()
             };
 
-            transactions.push(tx);
-            saveAndRefresh();
-        }
+            try {
+                await addDoc(collection(db, "transactions"), tx);
+                loadTransactions();
+            } catch (err) {
+                console.error("Error al guardar en Firebase:", err);
+                alert("Hubo un error al guardar en la nube.");
+            }
+        };
 
-        function deleteTransaction(id) {
-            transactions = transactions.filter(t => t.id !== id);
-            saveAndRefresh();
-        }
-
-        function saveAndRefresh() {
-            localStorage.setItem('family_finance_txs', JSON.stringify(transactions));
-            updateUI();
-        }
+        window.deleteTransaction = async function(firebaseId) {
+            try {
+                await deleteDoc(doc(db, "transactions", firebaseId));
+                loadTransactions();
+            } catch (err) {
+                console.error("Error al eliminar en Firebase:", err);
+            }
+        };
 
         function updateUI() {
             let totalInc = 0;
@@ -359,7 +393,7 @@
             const listEl = document.getElementById('transactions-list');
             listEl.innerHTML = '';
 
-            transactions.forEach(t => {
+            window.transactions.forEach(t => {
                 if (t.type === 'income') totalInc += t.amount;
                 else totalExp += t.amount;
 
@@ -373,7 +407,7 @@
                         ${t.type === 'income' ? '+' : '-'}$${t.amount.toFixed(2)}
                     </td>
                     <td class="py-3 text-right">
-                        <button onclick="deleteTransaction(${t.id})" class="text-slate-400 hover:text-rose-600 transition"><i class="fa-solid fa-trash"></i></button>
+                        <button onclick="deleteTransaction('${t.firebaseId}')" class="text-slate-400 hover:text-rose-600 transition"><i class="fa-solid fa-trash"></i></button>
                     </td>
                 `;
                 listEl.appendChild(row);
@@ -396,7 +430,7 @@
             const ctx = document.getElementById('expenseChart').getContext('2d');
             const catTotals = { 'Alimentación': 0, 'Vivienda/Servicios': 0, 'Transporte': 0, 'Entretenimiento': 0, 'Otros': 0 };
 
-            transactions.filter(t => t.type === 'expense').forEach(t => {
+            window.transactions.filter(t => t.type === 'expense').forEach(t => {
                 if (catTotals[t.category] !== undefined) catTotals[t.category] += t.amount;
             });
 
@@ -419,21 +453,20 @@
             });
         }
 
-        // Generar Código QR con la URL actual de la página
-        function openQRModal() {
+        window.openQRModal = function() {
             document.getElementById('qr-modal').classList.remove('hidden');
             const qrContainer = document.getElementById('qrcode');
-            qrContainer.innerHTML = ''; // Limpiar previo
+            qrContainer.innerHTML = '';
             new QRCode(qrContainer, {
                 text: window.location.href,
                 width: 160,
                 height: 160
             });
-        }
+        };
 
-        function closeQRModal() {
+        window.closeQRModal = function() {
             document.getElementById('qr-modal').classList.add('hidden');
-        }
+        };
     </script>
 </body>
 </html>
