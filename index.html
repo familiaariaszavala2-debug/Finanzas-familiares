@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finanzas Familiares</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-50 font-sans text-slate-800">
+
+    <!-- Pantalla de Autenticación (Login / Registro) -->
+    <div id="auth-screen" class="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-indigo-900 via-slate-900 to-blue-900">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
+            <div class="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">
+                <i class="fa-solid fa-wallet"></i>
+            </div>
+            <h1 class="text-2xl font-bold text-slate-900 mb-1 text-center">Finanzas Familiares</h1>
+            <p id="auth-subtitle" class="text-slate-500 mb-6 text-sm text-center">Inicia sesión para gestionar el hogar</p>
+            
+            <!-- Formulario de Login -->
+            <form id="login-form" onsubmit="handleLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 mb-1">Usuario</label>
+                    <input type="text" id="login-user" required placeholder="Ej. Papá o Mamá" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-indigo-600">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 mb-1">Contraseña</label>
+                    <input type="password" id="login-pass" required placeholder="••••••••" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-indigo-600">
+                </div>
+                <p id="login-error" class="text-xs text-rose-600 text-center hidden">Usuario o contraseña incorrectos.</p>
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-xl text-sm transition shadow-md">Iniciar Sesión</button>
+                <div class="text-center mt-4">
+                    <button type="button" onclick="toggleAuthMode('register')" class="text-xs text-indigo-600 hover:underline font-semibold">¿No tienes cuenta? Regístrate aquí</button>
+                </div>
+            </form>
+
+            <!-- Formulario de Registro -->
+            <form id="register-form" onsubmit="handleRegister(event)" class="space-y-4 hidden">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 mb-1">Nombre de Usuario</label>
+                    <input type="text" id="reg-user" required placeholder="Ej. Papá, Mamá o Nombre" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-indigo-600">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 mb-1">Contraseña</label>
+                    <input type="password" id="reg-pass" required placeholder="••••••••" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-indigo-600">
+                </div>
+                <p id="reg-error" class="text-xs text-rose-600 text-center hidden">El usuario ya existe.</p>
+                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-xl text-sm transition shadow-md">Crear Cuenta</button>
+                <div class="text-center mt-4">
+                    <button type="button" onclick="toggleAuthMode('login')" class="text-xs text-indigo-600 hover:underline font-semibold">¿Ya tienes cuenta? Inicia sesión</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Panel Principal (Oculto inicialmente) -->
+    <div id="app-screen" class="hidden min-h-screen flex flex-col">
+        <!-- Barra superior -->
+        <header class="bg-white border-b border-slate-200 sticky top-0 z-30 px-6 py-4 flex justify-between items-center shadow-sm">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center font-bold">
+                    <i class="fa-solid fa-chart-pie"></i>
+                </div>
+                <div>
+                    <h2 class="font-bold text-slate-800 text-lg">Control Financiero</h2>
+                    <p class="text-xs text-slate-500">Sesión activa: <span id="user-badge" class="font-semibold text-indigo-600"></span></p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-3">
+                <button onclick="openQRModal()" class="bg-indigo-50 text-indigo-600 border border-indigo-200 px-4 py-2 rounded-xl text-sm font-semibold hover:bg-indigo-100 transition flex items-center space-x-2">
+                    <i class="fa-solid fa-qrcode"></i>
+                    <span>QR Familiar</span>
+                </button>
+                <button onclick="logout()" class="bg-slate-100 text-slate-600 px-4 py-2 rounded-xl text-sm font-semibold hover:bg-slate-200 transition">
+                    <i class="fa-solid fa-right-from-bracket mr-1"></i> Salir
+                </button>
+            </div>
+        </header>
+
+        <!-- Contenido principal -->
+        <main class="flex-1 max-w-7xl w-full mx-auto p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- Columna Izquierda y Centro: Resumen y Formularios -->
+            <div class="lg:col-span-2 space-y-6">
+                
+                <!-- Tarjetas de Resumen -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Ingresos Totales</p>
+                        <h3 id="total-income" class="text-2xl font-bold text-emerald-600">$0.00</h3>
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Gastos Totales</p>
+                        <h3 id="total-expenses" class="text-2xl font-bold text-rose-600">$0.00</h3>
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Balance Restante</p>
+                        <h3 id="total-balance" class="text-2xl font-bold text-indigo-600">$0.00</h3>
+                    </div>
+                </div>
+
+                <!-- Formularios de Ingreso y Gasto -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Formulario Ingresos -->
+                    <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                        <h3 class="font-bold text-slate-800 mb-4 flex items-center">
+                            <i class="fa-solid fa-circle-plus text-emerald-500 mr-2"></i> Registrar Ingreso
+                        </h3>
+                        <form onsubmit="addTransaction(event, 'income')" class="space-y-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 mb-1">Descripción</label>
+                                <input type="text" id="inc-desc" required placeholder="Ej. Salario, Venta..." class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-indigo-600">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 mb-1">Monto ($)</label>
+                                <input type="number" step="0.01" id="inc-amount" required placeholder="0.00" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-indigo-600">
+                            </div>
+                            <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 rounded-xl text-sm transition">Agregar Ingreso</button>
+                        </form>
+                    </div>
+
+                    <!-- Formulario Gastos -->
+                    <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                        <h3 class="font-bold text-slate-800 mb-4 flex items-center">
+                            <i class="fa-solid fa-circle-minus text-rose-500 mr-2"></i> Registrar Gasto Detallado
+                        </h3>
+                        <form onsubmit="addTransaction(event, 'expense')" class="space-y-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 mb-1">Descripción</label>
+                                <input type="text" id="exp-desc" required placeholder="Ej. Supermercado, Luz..." class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-600">
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-500 mb-1">Monto ($)</label>
+                                    <input type="number" step="0.01" id="exp-amount" required placeholder="0.00" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-600">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-500 mb-1">Categoría</label>
+                                    <select id="exp-category" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-600">
+                                        <option value="Alimentación">Alimentación</option>
+                                        <option value="Vivienda/Servicios">Vivienda/Servicios</option>
+                                        <option value="Transporte">Transporte</option>
+                                        <option value="Entretenimiento">Entretenimiento</option>
+                                        <option value="Otros">Otros</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <button type="submit" class="w-full bg-rose-600 hover:bg-rose-700 text-white font-semibold py-2 rounded-xl text-sm transition">Agregar Gasto</button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Historial de Transacciones -->
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                    <h3 class="font-bold text-slate-800 mb-4">Movimientos Registrados</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead>
+                                <tr class="border-b border-slate-100 text-slate-400 font-semibold">
+                                    <th class="pb-3">Fecha / Perfil</th>
+                                    <th class="pb-3">Descripción</th>
+                                    <th class="pb-3">Categoría</th>
+                                    <th class="pb-3">Monto</th>
+                                    <th class="pb-3 text-right">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="transactions-list">
+                                <!-- Dinámico -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Columna Derecha: Asesor Inteligente & Gráfica -->
+            <div class="space-y-6">
+                
+                <!-- Distribución Sugerida (Asesor Inteligente) -->
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                    <h3 class="font-bold text-slate-800 mb-2 flex items-center">
+                        <i class="fa-solid fa-wand-magic-sparkles text-indigo-600 mr-2"></i> Asesor Financiero
+                    </h3>
+                    <p class="text-xs text-slate-500 mb-4">Recomendación basada en tus ingresos reales (Regla 50/30/20):</p>
+                    
+                    <div class="space-y-4 text-sm">
+                        <div>
+                            <div class="flex justify-between font-semibold mb-1">
+                                <span class="text-slate-600">Necesidades (50%)</span>
+                                <span id="rec-needs" class="text-indigo-600">$0.00</span>
+                            </div>
+                            <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                                <div id="bar-needs" class="bg-indigo-600 h-full w-0 transition-all"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between font-semibold mb-1">
+                                <span class="text-slate-600">Ahorro & Inversión (20%)</span>
+                                <span id="rec-savings" class="text-emerald-600">$0.00</span>
+                            </div>
+                            <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                                <div id="bar-savings" class="bg-emerald-500 h-full w-0 transition-all"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between font-semibold mb-1">
+                                <span class="text-slate-600">Gastos Personales (30%)</span>
+                                <span id="rec-personal" class="text-amber-600">$0.00</span>
+                            </div>
+                            <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                                <div id="bar-personal" class="bg-amber-500 h-full w-0 transition-all"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Gráfica de Gastos -->
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                    <h3 class="font-bold text-slate-800 mb-4">Gastos por Categoría</h3>
+                    <div class="relative h-64 flex items-center justify-center">
+                        <canvas id="expenseChart"></canvas>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal de Código QR Familiar -->
+    <div id="qr-modal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl">
+            <h3 class="font-bold text-lg text-slate-800 mb-1">Conectar otro dispositivo</h3>
+            <p class="text-xs text-slate-500 mb-4">Escanea este código QR con el celular de papá o mamá para abrir la app directamente:</p>
+            
+            <div id="qrcode" class="flex justify-center mb-4 p-4 bg-slate-50 border border-slate-100 rounded-xl"></div>
+            
+            <button onclick="closeQRModal()" class="w-full bg-slate-100 text-slate-600 font-semibold py-2 rounded-xl text-sm hover:bg-slate-200 transition">Cerrar</button>
+        </div>
+    </div>
+
+    <!-- JavaScript de la aplicación -->
+    <script>
+        let currentUser = '';
+        let usersDB = JSON.parse(localStorage.getItem('family_finance_users')) || {
+            'papá': 'luisroberto',
+            'mamá': 'cruzmaribel'
+        };
+        let transactions = JSON.parse(localStorage.getItem('family_finance_txs')) || [];
+        let chartInstance = null;
+
+        function toggleAuthMode(mode) {
+            const loginForm = document.getElementById('login-form');
+            const registerForm = document.getElementById('register-form');
+            const subtitle = document.getElementById('auth-subtitle');
+            
+            if (mode === 'register') {
+                loginForm.classList.add('hidden');
+                registerForm.classList.remove('hidden');
+                subtitle.innerText = 'Crea una cuenta nueva para la familia';
+            } else {
+                registerForm.classList.add('hidden');
+                loginForm.classList.remove('hidden');
+                subtitle.innerText = 'Inicia sesión para gestionar el hogar';
+            }
+        }
+
+        function handleRegister(e) {
+            e.preventDefault();
+            const user = document.getElementById('reg-user').value.trim().toLowerCase();
+            const pass = document.getElementById('reg-pass').value.trim();
+            const errorEl = document.getElementById('reg-error');
+
+            if (usersDB[user]) {
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            usersDB[user] = pass;
+            localStorage.setItem('family_finance_users', JSON.stringify(usersDB));
+            
+            alert('¡Cuenta creada con éxito! Ahora puedes iniciar sesión.');
+            toggleAuthMode('login');
+        }
+
+        function handleLogin(e) {
+            e.preventDefault();
+            const user = document.getElementById('login-user').value.trim().toLowerCase();
+            const pass = document.getElementById('login-pass').value.trim();
+            const errorEl = document.getElementById('login-error');
+
+            if (usersDB[user] && usersDB[user] === pass) {
+                currentUser = user.charAt(0).toUpperCase() + user.slice(1);
+                errorEl.classList.add('hidden');
+                document.getElementById('user-badge').innerText = currentUser;
+                document.getElementById('auth-screen').classList.add('hidden');
+                document.getElementById('app-screen').classList.remove('hidden');
+                updateUI();
+            } else {
+                errorEl.classList.remove('hidden');
+            }
+        }
+
+        function logout() {
+            currentUser = '';
+            document.getElementById('login-user').value = '';
+            document.getElementById('login-pass').value = '';
+            document.getElementById('app-screen').classList.add('hidden');
+            document.getElementById('auth-screen').classList.remove('hidden');
+        }
+
+        function addTransaction(e, type) {
+            e.preventDefault();
+            let desc, amount, category;
+
+            if (type === 'income') {
+                desc = document.getElementById('inc-desc').value;
+                amount = parseFloat(document.getElementById('inc-amount').value);
+                category = 'Ingreso';
+                document.getElementById('inc-desc').value = '';
+                document.getElementById('inc-amount').value = '';
+            } else {
+                desc = document.getElementById('exp-desc').value;
+                amount = parseFloat(document.getElementById('exp-amount').value);
+                category = document.getElementById('exp-category').value;
+                document.getElementById('exp-desc').value = '';
+                document.getElementById('exp-amount').value = '';
+            }
+
+            const tx = {
+                id: Date.now(),
+                user: currentUser,
+                type,
+                desc,
+                amount,
+                category,
+                date: new Date().toLocaleDateString()
+            };
+
+            transactions.push(tx);
+            saveAndRefresh();
+        }
+
+        function deleteTransaction(id) {
+            transactions = transactions.filter(t => t.id !== id);
+            saveAndRefresh();
+        }
+
+        function saveAndRefresh() {
+            localStorage.setItem('family_finance_txs', JSON.stringify(transactions));
+            updateUI();
+        }
+
+        function updateUI() {
+            let totalInc = 0;
+            let totalExp = 0;
+            const listEl = document.getElementById('transactions-list');
+            listEl.innerHTML = '';
+
+            transactions.forEach(t => {
+                if (t.type === 'income') totalInc += t.amount;
+                else totalExp += t.amount;
+
+                const row = document.createElement('tr');
+                row.className = 'border-b border-slate-50 hover:bg-slate-50/50';
+                row.innerHTML = `
+                    <td class="py-3 text-xs text-slate-500">${t.date} <br><span class="font-semibold text-slate-700">${t.user}</span></td>
+                    <td class="py-3 font-medium text-slate-800">${t.desc}</td>
+                    <td class="py-3"><span class="px-2 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs">${t.category}</span></td>
+                    <td class="py-3 font-bold ${t.type === 'income' ? 'text-emerald-600' : 'text-rose-600'}">
+                        ${t.type === 'income' ? '+' : '-'}$${t.amount.toFixed(2)}
+                    </td>
+                    <td class="py-3 text-right">
+                        <button onclick="deleteTransaction(${t.id})" class="text-slate-400 hover:text-rose-600 transition"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                `;
+                listEl.appendChild(row);
+            });
+
+            const balance = totalInc - totalExp;
+            document.getElementById('total-income').innerText = `$${totalInc.toFixed(2)}`;
+            document.getElementById('total-expenses').innerText = `$${totalExp.toFixed(2)}`;
+            document.getElementById('total-balance').innerText = `$${balance.toFixed(2)}`;
+
+            // Asesor inteligente
+            document.getElementById('rec-needs').innerText = `$${(totalInc * 0.5).toFixed(2)}`;
+            document.getElementById('rec-savings').innerText = `$${(totalInc * 0.2).toFixed(2)}`;
+            document.getElementById('rec-personal').innerText = `$${(totalInc * 0.3).toFixed(2)}`;
+
+            updateChart();
+        }
+
+        function updateChart() {
+            const ctx = document.getElementById('expenseChart').getContext('2d');
+            const catTotals = { 'Alimentación': 0, 'Vivienda/Servicios': 0, 'Transporte': 0, 'Entretenimiento': 0, 'Otros': 0 };
+
+            transactions.filter(t => t.type === 'expense').forEach(t => {
+                if (catTotals[t.category] !== undefined) catTotals[t.category] += t.amount;
+            });
+
+            if (chartInstance) chartInstance.destroy();
+
+            chartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(catTotals),
+                    datasets: [{
+                        data: Object.values(catTotals),
+                        backgroundColor: ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#64748b']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } }
+                }
+            });
+        }
+
+        // Generar Código QR con la URL actual de la página
+        function openQRModal() {
+            document.getElementById('qr-modal').classList.remove('hidden');
+            const qrContainer = document.getElementById('qrcode');
+            qrContainer.innerHTML = ''; // Limpiar previo
+            new QRCode(qrContainer, {
+                text: window.location.href,
+                width: 160,
+                height: 160
+            });
+        }
+
+        function closeQRModal() {
+            document.getElementById('qr-modal').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
