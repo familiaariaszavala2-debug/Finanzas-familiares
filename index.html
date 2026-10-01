@@ -101,8 +101,8 @@
     }
 
     function register() {
-        const name = document.getElementById('reg-name').value;
-        const email = document.getElementById('reg-email').value;
+        const name = document.getElementById('reg-name').value.trim();
+        const email = document.getElementById('reg-email').value.trim();
         const pass = document.getElementById('reg-pass').value;
 
         if(!name || !email || !pass) return alert("Completa todos los campos");
@@ -116,7 +116,7 @@
     }
 
     function login() {
-        const email = document.getElementById('login-email').value;
+        const email = document.getElementById('login-email').value.trim();
         const pass = document.getElementById('login-pass').value;
         
         const user = db.users.find(u => u.email === email && u.pass === pass);
@@ -137,6 +137,10 @@
         if(currentUser) {
             // Refrescar datos del usuario desde la db
             currentUser = db.users.find(u => u.id === currentUser.id);
+            if (!currentUser) {
+                logout();
+                return;
+            }
             document.getElementById('auth-section').classList.add('hidden');
             document.getElementById('dashboard-section').classList.remove('hidden');
             document.getElementById('welcome-msg').innerText = `Hola, ${currentUser.name}`;
@@ -148,17 +152,18 @@
     }
 
     function createFamily() {
-        const fname = document.getElementById('family-name').value;
+        const fname = document.getElementById('family-name').value.trim();
         if(!fname) return alert("Escribe un nombre para la familia");
 
         const familyId = 'f_' + Date.now();
-        const code = Math.random().toString(36.substring(2, 8)).toUpperCase();
+        // Corrección aplicada aquí:
+        const code = Math.random().toString(36).substring(2, 8).toUpperCase();
         
         db.families.push({ id: familyId, name: fname, code: code });
         currentUser.familyId = familyId;
         
-        // Actualizar usuario en la BD
         db.users = db.users.map(u => u.id === currentUser.id ? currentUser : u);
+        sessionStorage.setItem('current_user', JSON.stringify(currentUser));
         saveDB();
         updateFamilyUI();
     }
@@ -171,6 +176,7 @@
 
         currentUser.familyId = family.id;
         db.users = db.users.map(u => u.id === currentUser.id ? currentUser : u);
+        sessionStorage.setItem('current_user', JSON.stringify(currentUser));
         saveDB();
         updateFamilyUI();
     }
@@ -186,8 +192,10 @@
             financePanel.classList.remove('hidden');
 
             const family = db.families.find(f => f.id === currentUser.familyId);
-            document.getElementById('display-family-name').innerText = family.name;
-            document.getElementById('display-family-code').innerText = family.code;
+            if (family) {
+                document.getElementById('display-family-name').innerText = family.name;
+                document.getElementById('display-family-code').innerText = family.code;
+            }
             renderTransactions();
         } else {
             noFamilyDiv.classList.remove('hidden');
@@ -199,7 +207,7 @@
     function addTransaction() {
         const type = document.getElementById('tx-type').value;
         const amount = parseFloat(document.getElementById('tx-amount').value);
-        const desc = document.getElementById('tx-desc').value;
+        const desc = document.getElementById('tx-desc').value.trim();
 
         if(!amount || !desc) return alert("Rellena todos los campos de la transacción");
 
@@ -231,7 +239,7 @@
             return;
         }
 
-        list.innerHTML = familyTxs.reverse().map(t => `
+        list.innerHTML = [...familyTxs].reverse().map(t => `
             <div class="transaction-item">
                 <div>
                     <strong>${t.userName}</strong>: ${t.desc} <br>
